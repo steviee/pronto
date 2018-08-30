@@ -2,36 +2,43 @@
 
 Distributed Storage Service for Protobuf-Defined Data, written in Golang called Pronto (because it's meant to be fast...)
 
-## Why?
+## Introduction
+
+This part is about the motivation and current setup.
+
+### Why?
 
 Storing data defined by .proto files someplace save and without wasting lots of disk-space is currently no easy feat.
 Using something like Apacha Kafka to stream data to HBase or HDFS seems cumbersome at best and needs a lot of setup. 
 And by the way I don't like (read: despise) the Hadoop infrastructure and Kafka for they are glorified jack-of-all-trades
 services (eierlegende Wollmichsäue) and therefore involve too much hassle to be configured for simple use cases.
 
-## How?
+Also getting .proto files back out of Hadoop might pose difficult at best.
 
-Pronto is meant to be a simple storage service where you create buckets of types (in form of .proto files) and are then able
-to POST protocol buffers into those buckets. Each buffer will be assosiated with a cluster-unique Id-hash that you can use for 
-fast access.
+### How?
 
-The buffers will be stored within the filesystem of the node running the ProntonDB service so chosing a filesystem for the 
-desired type and expected buffer sizes is important (while Ext4 is almost always a good choice).
+Pronto is meant to be a simple storage service where you create buckets of types (in form of .proto files) and are then able to POST protocol buffers into those buckets. Each buffer will be assosiated with a cluster-unique Id-hash that you can use for fast access.
 
-## Motivation
+The buffers will be stored within the filesystem of the node running the ProntonDB service so chosing a filesystem for the desired type and expected buffer sizes is important (while Ext4 is almost always a good choice).
 
-I have to store lots of records (currently mainly JSON documents) in a storage that's easily accessible and Elasticsearch is not
-exactly disk-space friendly, a relational database is pure misuse (and not what I really need) and - as mentioned above - I don't want to use Apache Kafka or anything related.
+### Motivation
+
+I have to store lots of records (currently mainly JSON documents) in a storage that's easily accessible. I know the general schema of the JSON documents because we are GDPR aware and need to find data (later) according to user ids or other properties.
+
+Elasticsearch (curretly in use) is not exactly disk-space friendly, a relational database is pure misuse (and not what I really need) and - as mentioned above - I don't want to use Apache Kafka or anything related.
+They work well in their own environments but crossing the border is more struggle than passing US customs...
 
 I also think it's a good learning-experience regarding cluster software and high-load systems.
 
-## When?
+### When?
 
 It's done when it's done...
 
-# Initial Concept 
+## Initial Concept
 
-## Storing (binary) data
+The next part shows a little bit what different features I had in mind to build a prototype.
+
+### Storing (binary) data
 
 Data is stored in its original form (protobuf byte-streams) and directly written to disk. Incoming data gets a key determined by the node that accepted the request, the bucket the request belongs to and the time the request arrived. (for this I would use something like hashid).
 
@@ -41,9 +48,9 @@ Also this solution scales quickly as a growing cluster would just broaden the nu
 It's unclear at this stage if each record will be saved as a single file or within a compound to save on diskspace (fragmentation with lots of small files).  
 This depends vastly on the actual size of data records and the used indexing library (if any).
 
-## Clustering
+### Clustering
 
-Each server instance should be perfectly fine alone. I suppose making use of hashicorps memberlist package makes sense for joining multiple instances into a cluster.
+Each server instance should be perfectly fine alone. I propose making use of hashicorps memberlist package for joining multiple instances into a cluster.
 
 The cluster setup addresses three issues:
 
@@ -57,17 +64,17 @@ The cluster setup addresses three issues:
 
 The nodes of the cluster would ping all other nodes to ascertain latency and get current disk utilisation stats.
 
-## Accessing the service
+### Accessing the service
 
 The service is accessible via gRPC calls to create, read, update and delete a record within a bucket.
 
 There could also be a JSON REST endpoint for CRUD operations against a bucket that would use on-demand converting (marshalling and unmarshalling) of JSON to ProtoBuf and vice-versa.
 
-## Retention
+### Retention
 
 Records get certain metadata making sure there's a TTL configurable. 
 
-## GDPR
+### GDPR
 
 Records have .proto files so are generally parsable. Addig a query engine to find records with a certain property is not part of the initial implementation.
 
